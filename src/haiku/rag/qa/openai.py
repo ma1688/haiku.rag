@@ -12,6 +12,7 @@ try:
     from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 
     from haiku.rag.client import HaikuRAG
+    from haiku.rag.config import Config
     from haiku.rag.qa.base import QuestionAnswerAgentBase
 
     class QuestionAnswerOpenAIAgent(QuestionAnswerAgentBase):
@@ -22,7 +23,11 @@ try:
             ]
 
         async def answer(self, question: str) -> str:
-            openai_client = AsyncOpenAI()
+            # Support custom base URL for OpenAI-compatible APIs
+            openai_client = AsyncOpenAI(
+                api_key=Config.OPENAI_API_KEY,
+                base_url=Config.OPENAI_BASE_URL if Config.OPENAI_BASE_URL else None
+            )
 
             messages: list[ChatCompletionMessageParam] = [
                 ChatCompletionSystemMessageParam(

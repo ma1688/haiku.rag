@@ -9,7 +9,11 @@ try:
         _vector_dim: int = 1536
 
         async def embed(self, text: str) -> list[float]:
-            client = AsyncOpenAI()
+            # Support custom base URL for OpenAI-compatible APIs
+            client = AsyncOpenAI(
+                api_key=Config.OPENAI_API_KEY,
+                base_url=Config.OPENAI_BASE_URL if Config.OPENAI_BASE_URL else None
+            )
             response = await client.embeddings.create(
                 model=self._model,
                 input=text,

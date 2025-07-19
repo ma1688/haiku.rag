@@ -30,7 +30,12 @@ class AppConfig(BaseModel):
     # Provider keys
     VOYAGE_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
+    OPENAI_BASE_URL: str = ""
     ANTHROPIC_API_KEY: str = ""
+
+    # SiliconFlow configuration
+    SILICONFLOW_API_KEY: str = ""
+    SILICONFLOW_BASE_URL: str = "https://api.siliconflow.cn/v1"
 
     @field_validator("MONITOR_DIRECTORIES", mode="before")
     @classmethod
