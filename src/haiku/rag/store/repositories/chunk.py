@@ -2,6 +2,7 @@ import json
 import re
 
 from haiku.rag.chunker import chunker
+from haiku.rag.config import Config
 from haiku.rag.embeddings import get_embedder
 from haiku.rag.query_processor import query_processor
 from haiku.rag.store.models.chunk import Chunk
@@ -14,6 +15,22 @@ class ChunkRepository(BaseRepository[Chunk]):
     def __init__(self, store):
         super().__init__(store)
         self.embedder = get_embedder()
+        
+        # Initialize appropriate chunker based on configuration
+        if Config.USE_FINANCIAL_CHUNKER:
+            from haiku.rag.domains.financial.chunker import FinancialChunker
+            self.chunker = FinancialChunker(
+                chunk_size=Config.FINANCIAL_CHUNK_SIZE,
+                chunk_overlap=Config.FINANCIAL_CHUNK_OVERLAP,
+                preserve_tables=Config.PRESERVE_TABLES,
+                extract_metadata=Config.EXTRACT_METADATA
+            )
+        else:
+            from haiku.rag.chunker import Chunker
+            self.chunker = Chunker(
+                chunk_size=Config.CHUNK_SIZE,
+                chunk_overlap=Config.CHUNK_OVERLAP
+            )
 
     async def create(self, entity: Chunk, commit: bool = True) -> Chunk:
         """Create a chunk in the database."""
@@ -193,8 +210,8 @@ class ChunkRepository(BaseRepository[Chunk]):
         self, document_id: int, content: str, commit: bool = True
     ) -> list[Chunk]:
         """Create chunks and embeddings for a document."""
-        # Chunk the document content
-        chunk_texts = await chunker.chunk(content)
+        # Chunk the document content using instance chunker
+        chunk_texts = await self.chunker.chunk(content)
         created_chunks = []
 
         # Create chunks with embeddings using the create method

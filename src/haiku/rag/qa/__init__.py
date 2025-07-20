@@ -8,6 +8,12 @@ def get_qa_agent(client: HaikuRAG, model: str = "") -> QuestionAnswerAgentBase:
     """
     Factory function to get the appropriate QA agent based on the configuration.
     """
+    # Check if financial QA is enabled
+    if Config.USE_FINANCIAL_QA:
+        from haiku.rag.domains.financial.qa import FinancialQuestionAnswerAgent
+        return FinancialQuestionAnswerAgent(client)
+    
+    # Standard QA agents
     if Config.QA_PROVIDER == "ollama":
         return QuestionAnswerOllamaAgent(client, model or Config.QA_MODEL)
 

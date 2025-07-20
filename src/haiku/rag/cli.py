@@ -29,7 +29,11 @@ async def check_version():
 def main():
     """haiku.rag CLI - SQLite-based RAG system"""
     # Run version check before any command
-    asyncio.run(check_version())
+    try:
+        asyncio.run(check_version())
+    except Exception:
+        # Skip version check if it fails
+        pass
 
 
 @cli.command("list", help="List all stored documents")

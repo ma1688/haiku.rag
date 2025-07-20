@@ -24,6 +24,17 @@ class AppConfig(BaseModel):
 
     CHUNK_SIZE: int = 1024  # Much larger for better context retention
     CHUNK_OVERLAP: int = 256  # Larger overlap for better continuity
+    
+    # Financial document settings
+    USE_FINANCIAL_CHUNKER: bool = False  # Enable for HKEx announcements
+    FINANCIAL_CHUNK_SIZE: int = 1500  # Larger chunks for financial docs
+    FINANCIAL_CHUNK_OVERLAP: int = 400  # More overlap for context
+    PRESERVE_TABLES: bool = True  # Avoid splitting tables
+    EXTRACT_METADATA: bool = True  # Extract doc metadata
+    
+    # Financial QA settings
+    USE_FINANCIAL_QA: bool = False  # Enable financial-specific QA
+    FINANCIAL_QA_MODEL: str = ""  # Override QA model for financial queries
 
     OLLAMA_BASE_URL: str = "http://localhost:11434"
 
