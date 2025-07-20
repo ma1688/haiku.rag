@@ -28,17 +28,13 @@ class HaikuRAGApp:
         async with HaikuRAG(db_path=self.db_path) as self.client:
             doc = await self.client.create_document(text)
             self._rich_print_document(doc, truncate=True)
-            self.console.print(
-                f"[b]Document with id [cyan]{doc.id}[/cyan] added successfully.[/b]"
-            )
+            self.console.print(f"[b]Document with id [cyan]{doc.id}[/cyan] added successfully.[/b]")
 
     async def add_document_from_source(self, file_path: Path):
         async with HaikuRAG(db_path=self.db_path) as self.client:
             doc = await self.client.create_document_from_source(file_path)
             self._rich_print_document(doc, truncate=True)
-            self.console.print(
-                f"[b]Document with id [cyan]{doc.id}[/cyan] added successfully.[/b]"
-            )
+            self.console.print(f"[b]Document with id [cyan]{doc.id}[/cyan] added successfully.[/b]")
 
     async def get_document(self, doc_id: int):
         async with HaikuRAG(db_path=self.db_path) as self.client:
@@ -80,14 +76,10 @@ class HaikuRAGApp:
                 total_docs = len(documents)
 
                 if total_docs == 0:
-                    self.console.print(
-                        "[yellow]No documents found in database.[/yellow]"
-                    )
+                    self.console.print("[yellow]No documents found in database.[/yellow]")
                     return
 
-                self.console.print(
-                    f"[b]Rebuilding database with {total_docs} documents...[/b]"
-                )
+                self.console.print(f"[b]Rebuilding database with {total_docs} documents...[/b]")
                 with Progress() as progress:
                     task = progress.add_task("Rebuilding...", total=total_docs)
                     async for _ in client.rebuild_database():
@@ -106,10 +98,7 @@ class HaikuRAGApp:
         for field_name, field_value in Config.model_dump().items():
             # Format the display value
             if isinstance(field_value, str) and (
-                "key" in field_name.lower()
-                or "password" in field_name.lower()
-                or "token" in field_name.lower()
-            ):
+                    "key" in field_name.lower() or "password" in field_name.lower() or "token" in field_name.lower()):
                 # Hide sensitive values but show if they're set
                 display_value = "✓ Set" if field_value else "✗ Not set"
             else:
@@ -128,11 +117,9 @@ class HaikuRAGApp:
         else:
             content = Markdown(doc.content)
         self.console.print(
-            f"[repr.attrib_name]id[/repr.attrib_name]: {doc.id} [repr.attrib_name]uri[/repr.attrib_name]: {doc.uri} [repr.attrib_name]meta[/repr.attrib_name]: {doc.metadata}"
-        )
+            f"[repr.attrib_name]id[/repr.attrib_name]: {doc.id} [repr.attrib_name]uri[/repr.attrib_name]: {doc.uri} [repr.attrib_name]meta[/repr.attrib_name]: {doc.metadata}")
         self.console.print(
-            f"[repr.attrib_name]created at[/repr.attrib_name]: {doc.created_at} [repr.attrib_name]updated at[/repr.attrib_name]: {doc.updated_at}"
-        )
+            f"[repr.attrib_name]created at[/repr.attrib_name]: {doc.created_at} [repr.attrib_name]updated at[/repr.attrib_name]: {doc.updated_at}")
         self.console.print("[repr.attrib_name]content[/repr.attrib_name]:")
         self.console.print(content)
         self.console.rule()
@@ -140,10 +127,8 @@ class HaikuRAGApp:
     def _rich_print_search_result(self, chunk: Chunk, score: float):
         """Format a search result chunk for display."""
         content = Markdown(chunk.content)
-        self.console.print(
-            f"[repr.attrib_name]document_id[/repr.attrib_name]: {chunk.document_id} "
-            f"[repr.attrib_name]score[/repr.attrib_name]: {score:.4f}"
-        )
+        self.console.print(f"[repr.attrib_name]document_id[/repr.attrib_name]: {chunk.document_id} "
+                           f"[repr.attrib_name]score[/repr.attrib_name]: {score:.4f}")
         if chunk.document_uri:
             self.console.print("[repr.attrib_name]document uri[/repr.attrib_name]:")
             self.console.print(chunk.document_uri)

@@ -174,52 +174,42 @@ COMPARATIVE_ANALYSIS_PROMPT = """
 """
 
 # 查询意图分类
-INTENT_PROMPTS = {
-    "data_extraction": FINANCIAL_DATA_PROMPT,
-    "transaction_analysis": TRANSACTION_ANALYSIS_PROMPT,
-    "compliance_check": COMPLIANCE_CHECK_PROMPT,
-    "comparative_analysis": COMPARATIVE_ANALYSIS_PROMPT,
-}
+INTENT_PROMPTS = {"data_extraction": FINANCIAL_DATA_PROMPT, "transaction_analysis": TRANSACTION_ANALYSIS_PROMPT,
+    "compliance_check": COMPLIANCE_CHECK_PROMPT, "comparative_analysis": COMPARATIVE_ANALYSIS_PROMPT, }
+
 
 # 查询意图识别函数
 def get_intent_prompt(query: str) -> str:
     """根据查询内容返回合适的提示词"""
     query_lower = query.lower()
-    
+
     # 数据提取类
-    if any(keyword in query_lower for keyword in [
-        "金额", "价格", "营收", "利润", "财务", "数据", 
-        "amount", "price", "revenue", "profit", "financial"
-    ]):
+    if any(keyword in query_lower for keyword in
+           ["金额", "价格", "营收", "利润", "财务", "数据", "amount", "price", "revenue", "profit", "financial"]):
         return INTENT_PROMPTS["data_extraction"]
-    
+
     # 交易分析类
-    elif any(keyword in query_lower for keyword in [
-        "收购", "并购", "出售", "交易", "条款", "结构",
-        "acquisition", "merger", "disposal", "transaction", "terms"
-    ]):
+    elif any(keyword in query_lower for keyword in
+             ["收购", "并购", "出售", "交易", "条款", "结构", "acquisition", "merger", "disposal", "transaction",
+                 "terms"]):
         return INTENT_PROMPTS["transaction_analysis"]
-    
+
     # 合规检查类
-    elif any(keyword in query_lower for keyword in [
-        "合规", "关连", "批准", "规则", "披露",
-        "compliance", "connected", "approval", "rules", "disclosure"
-    ]):
+    elif any(keyword in query_lower for keyword in
+             ["合规", "关连", "批准", "规则", "披露", "compliance", "connected", "approval", "rules", "disclosure"]):
         return INTENT_PROMPTS["compliance_check"]
-    
+
     # 比较分析类
-    elif any(keyword in query_lower for keyword in [
-        "比较", "对比", "相比", "估值", "同业",
-        "compare", "versus", "valuation", "peer"
-    ]):
+    elif any(keyword in query_lower for keyword in
+             ["比较", "对比", "相比", "估值", "同业", "compare", "versus", "valuation", "peer"]):
         return INTENT_PROMPTS["comparative_analysis"]
-    
+
     # 默认返回基础提示词
     return ""
 
+
 # 回答格式模板
-ANSWER_FORMATS = {
-    "financial_data": """
+ANSWER_FORMATS = {"financial_data": """
 【{company_name}】{announcement_type}
 
 📊 关键财务数据：
@@ -234,7 +224,7 @@ ANSWER_FORMATS = {
 🔗 信息来源：
 {source_reference}
 """,
-    
+
     "transaction_summary": """
 【交易概要】{transaction_title}
 
@@ -256,7 +246,7 @@ ANSWER_FORMATS = {
 🔗 信息来源：
 {source_reference}
 """,
-    
+
     "compliance_report": """
 【合规检查报告】{announcement_title}
 
@@ -275,7 +265,7 @@ ANSWER_FORMATS = {
 🔗 信息来源：
 {source_reference}
 """,
-    
+
     "comparison_table": """
 【比较分析】{comparison_title}
 
@@ -289,40 +279,23 @@ ANSWER_FORMATS = {
 
 🔗 信息来源：
 {source_reference}
-"""
-}
+"""}
 
 # 错误处理模板
 ERROR_MESSAGES = {
     "no_data_found": "根据检索到的文档，未找到关于{query_topic}的相关信息。建议：\n1. 尝试使用不同的关键词\n2. 检查公司名称或股票代码是否正确\n3. 确认时间范围是否合适",
-    
+
     "incomplete_data": "找到部分相关信息，但以下数据缺失：\n{missing_items}\n\n已获得信息：\n{available_data}",
-    
+
     "ambiguous_query": "查询需求不够明确。请说明：\n1. 具体的公司名称或股票代码\n2. 需要查询的信息类型\n3. 相关的时间范围",
-    
-    "multiple_results": "找到多个相关结果。请进一步明确：\n{results_summary}\n\n请指定具体需要哪一项。"
-}
+
+    "multiple_results": "找到多个相关结果。请进一步明确：\n{results_summary}\n\n请指定具体需要哪一项。"}
 
 # 金融术语词典（中英对照）
-FINANCIAL_TERMS = {
-    "收购": "Acquisition",
-    "合并": "Merger",
-    "关连交易": "Connected Transaction", 
-    "主要交易": "Major Transaction",
-    "每股盈利": "Earnings Per Share (EPS)",
-    "市盈率": "Price-to-Earnings Ratio (P/E)",
-    "资产净值": "Net Asset Value (NAV)",
-    "息税折旧摊销前利润": "EBITDA",
-    "尽职调查": "Due Diligence",
-    "业绩承诺": "Performance Guarantee",
-    "对赌协议": "Valuation Adjustment Mechanism (VAM)",
-    "锁定期": "Lock-up Period",
-    "公允价值": "Fair Value",
-    "商誉": "Goodwill",
-    "或有对价": "Contingent Consideration",
-    "控股股东": "Controlling Shareholder",
-    "独立第三方": "Independent Third Party",
-    "备考": "Pro Forma",
-    "经审计": "Audited",
-    "未经审计": "Unaudited"
-}
+FINANCIAL_TERMS = {"收购": "Acquisition", "合并": "Merger", "关连交易": "Connected Transaction",
+    "主要交易": "Major Transaction", "每股盈利": "Earnings Per Share (EPS)", "市盈率": "Price-to-Earnings Ratio (P/E)",
+    "资产净值": "Net Asset Value (NAV)", "息税折旧摊销前利润": "EBITDA", "尽职调查": "Due Diligence",
+    "业绩承诺": "Performance Guarantee", "对赌协议": "Valuation Adjustment Mechanism (VAM)", "锁定期": "Lock-up Period",
+    "公允价值": "Fair Value", "商誉": "Goodwill", "或有对价": "Contingent Consideration",
+    "控股股东": "Controlling Shareholder", "独立第三方": "Independent Third Party", "备考": "Pro Forma",
+    "经审计": "Audited", "未经审计": "Unaudited"}

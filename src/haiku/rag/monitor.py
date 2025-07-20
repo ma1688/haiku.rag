@@ -41,7 +41,6 @@ class FileWatcher:
 
     async def refresh(self):
         """Refresh all monitored directories by scanning for new/updated files."""
-        import asyncio
 
         files_to_process = []
         for path in self.paths:

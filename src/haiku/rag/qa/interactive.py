@@ -15,23 +15,18 @@ import json
 import logging
 import sys
 import time
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
 from dataclasses import dataclass, asdict
-from functools import lru_cache
-from contextlib import asynccontextmanager
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 from rich.console import Console
-from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich.prompt import Prompt, Confirm
 from rich.table import Table
 from rich.text import Text
-from rich.tree import Tree
-from rich.status import Status
 
 from haiku.rag.client import HaikuRAG
 from haiku.rag.config import Config
@@ -42,6 +37,7 @@ from haiku.rag.qa.base import QuestionAnswerAgentBase
 
 # Constants and Configuration
 logger = get_logger()
+
 
 @dataclass
 class SessionConfig:
@@ -58,6 +54,7 @@ class SessionConfig:
     enable_metrics: bool = True
     enable_caching: bool = True
 
+
 @dataclass
 class ConversationExchange:
     """Represents a single conversation exchange."""
@@ -70,14 +67,10 @@ class ConversationExchange:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
-        return {
-            "timestamp": self.timestamp.isoformat(),
-            "question": self.question,
-            "answer": self.answer,
+        return {"timestamp": self.timestamp.isoformat(), "question": self.question, "answer": self.answer,
             "search_results": [(str(chunk), score) for chunk, score in self.search_results],
-            "response_time": self.response_time,
-            "tokens_used": self.tokens_used
-        }
+            "response_time": self.response_time, "tokens_used": self.tokens_used}
+
 
 class ConversationHistory:
     """Enhanced conversation history management with persistence and analytics."""
@@ -88,13 +81,8 @@ class ConversationHistory:
         self.history: List[ConversationExchange] = []
         self.session_start = datetime.now()
         self._cache: Dict[str, Any] = {}
-        self._metrics = {
-            "total_questions": 0,
-            "total_response_time": 0.0,
-            "avg_response_time": 0.0,
-            "cache_hits": 0,
-            "cache_misses": 0
-        }
+        self._metrics = {"total_questions": 0, "total_response_time": 0.0, "avg_response_time": 0.0, "cache_hits": 0,
+            "cache_misses": 0}
 
     def _generate_session_id(self) -> str:
         """Generate a unique session ID."""
@@ -103,25 +91,17 @@ class ConversationHistory:
         return f"session_{timestamp}_{random_hash}"
 
     def add_exchange(self, question: str, answer: str, search_results: Optional[List] = None,
-                    response_time: float = 0.0, tokens_used: Optional[int] = None):
+                     response_time: float = 0.0, tokens_used: Optional[int] = None):
         """Add a question-answer exchange to history with enhanced metadata."""
-        exchange = ConversationExchange(
-            timestamp=datetime.now(),
-            question=question,
-            answer=answer,
-            search_results=search_results or [],
-            response_time=response_time,
-            tokens_used=tokens_used
-        )
+        exchange = ConversationExchange(timestamp=datetime.now(), question=question, answer=answer,
+            search_results=search_results or [], response_time=response_time, tokens_used=tokens_used)
 
         self.history.append(exchange)
 
         # Update metrics
         self._metrics["total_questions"] += 1
         self._metrics["total_response_time"] += response_time
-        self._metrics["avg_response_time"] = (
-            self._metrics["total_response_time"] / self._metrics["total_questions"]
-        )
+        self._metrics["avg_response_time"] = (self._metrics["total_response_time"] / self._metrics["total_questions"])
 
         # Keep only the most recent exchanges
         if len(self.history) > self.config.max_history:
@@ -161,29 +141,17 @@ class ConversationHistory:
     def get_metrics(self) -> Dict[str, Any]:
         """Get session metrics and statistics."""
         session_duration = datetime.now() - self.session_start
-        return {
-            **self._metrics,
-            "session_duration": str(session_duration).split('.')[0],
-            "session_id": self.session_id,
-            "total_exchanges": len(self.history),
-            "cache_hit_rate": (
-                self._metrics["cache_hits"] /
-                max(1, self._metrics["cache_hits"] + self._metrics["cache_misses"])
-            ) * 100
-        }
+        return {**self._metrics, "session_duration": str(session_duration).split('.')[0], "session_id": self.session_id,
+            "total_exchanges": len(self.history), "cache_hit_rate": (self._metrics["cache_hits"] / max(1, self._metrics[
+                "cache_hits"] + self._metrics["cache_misses"])) * 100}
 
     def clear(self):
         """Clear conversation history and reset metrics."""
         self.history.clear()
         self.session_start = datetime.now()
         self._cache.clear()
-        self._metrics = {
-            "total_questions": 0,
-            "total_response_time": 0.0,
-            "avg_response_time": 0.0,
-            "cache_hits": 0,
-            "cache_misses": 0
-        }
+        self._metrics = {"total_questions": 0, "total_response_time": 0.0, "avg_response_time": 0.0, "cache_hits": 0,
+            "cache_misses": 0}
         logger.info("Conversation history cleared")
 
     def save_to_file(self, file_path: Optional[Path] = None) -> Path:
@@ -193,13 +161,9 @@ class ConversationHistory:
 
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        session_data = {
-            "session_id": self.session_id,
-            "session_start": self.session_start.isoformat(),
-            "config": asdict(self.config),
-            "metrics": self.get_metrics(),
-            "history": [exchange.to_dict() for exchange in self.history]
-        }
+        session_data = {"session_id": self.session_id, "session_start": self.session_start.isoformat(),
+            "config": asdict(self.config), "metrics": self.get_metrics(),
+            "history": [exchange.to_dict() for exchange in self.history]}
 
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(session_data, f, indent=2, ensure_ascii=False)
@@ -258,8 +222,7 @@ class ContextAwareQAAgent(QuestionAnswerAgentBase):
         # Limit cache size
         if len(self._search_cache) > self.config.cache_size:
             # Remove oldest entries
-            oldest_key = min(self._search_cache.keys(),
-                           key=lambda k: self._search_cache[k][1])
+            oldest_key = min(self._search_cache.keys(), key=lambda k: self._search_cache[k][1])
             del self._search_cache[oldest_key]
 
     async def answer_with_context(self, question: str) -> Tuple[str, List]:
@@ -300,12 +263,8 @@ class ContextAwareQAAgent(QuestionAnswerAgentBase):
             response_time = time.time() - start_time
 
             # Add to conversation history with metrics
-            self.conversation_history.add_exchange(
-                question=question,
-                answer=answer,
-                search_results=search_results,
-                response_time=response_time
-            )
+            self.conversation_history.add_exchange(question=question, answer=answer, search_results=search_results,
+                response_time=response_time)
 
             logger.info(f"Question answered in {response_time:.2f}s")
             return answer, search_results
@@ -315,12 +274,8 @@ class ContextAwareQAAgent(QuestionAnswerAgentBase):
             response_time = time.time() - start_time
 
             # Add failed exchange to history for debugging
-            self.conversation_history.add_exchange(
-                question=question,
-                answer=f"Error: {str(e)}",
-                search_results=[],
-                response_time=response_time
-            )
+            self.conversation_history.add_exchange(question=question, answer=f"Error: {str(e)}", search_results=[],
+                response_time=response_time)
 
             raise
 
@@ -342,10 +297,8 @@ class ContextAwareQAAgent(QuestionAnswerAgentBase):
                 enhanced_parts.append(f"Relevant information from knowledge base:\n{search_context}")
 
         enhanced_parts.append(f"Current question: {question}")
-        enhanced_parts.append(
-            "Please answer the current question, taking into account the conversation context "
-            "and relevant information if applicable. Be concise but comprehensive."
-        )
+        enhanced_parts.append("Please answer the current question, taking into account the conversation context "
+                              "and relevant information if applicable. Be concise but comprehensive.")
 
         return "\n\n".join(enhanced_parts)
 
@@ -371,12 +324,8 @@ class ContextAwareQAAgent(QuestionAnswerAgentBase):
 
     def get_session_stats(self) -> Dict[str, Any]:
         """Get comprehensive session statistics."""
-        return {
-            **self.conversation_history.get_metrics(),
-            "cache_size": len(self._search_cache),
-            "model": self._model,
-            "config": asdict(self.config)
-        }
+        return {**self.conversation_history.get_metrics(), "cache_size": len(self._search_cache), "model": self._model,
+            "config": asdict(self.config)}
 
 
 class InteractiveQASession:
@@ -392,14 +341,8 @@ class InteractiveQASession:
 
         # Console and UI components
         self.console = Console()
-        self.progress = Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(),
-            console=self.console,
-            transient=True
-        )
+        self.progress = Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(),
+            TaskProgressColumn(), console=self.console, transient=True)
 
         # Core components
         self.client: Optional[HaikuRAG] = None
@@ -414,13 +357,8 @@ class InteractiveQASession:
         self._is_running = False
 
         # Performance tracking
-        self._performance_metrics = {
-            "total_queries": 0,
-            "successful_queries": 0,
-            "failed_queries": 0,
-            "avg_response_time": 0.0,
-            "total_response_time": 0.0
-        }
+        self._performance_metrics = {"total_queries": 0, "successful_queries": 0, "failed_queries": 0,
+            "avg_response_time": 0.0, "total_response_time": 0.0}
 
     async def __aenter__(self):
         """Enhanced async context manager entry with comprehensive initialization."""
@@ -454,7 +392,8 @@ class InteractiveQASession:
                 self.progress.update(init_task, advance=15, description="Finalizing setup...")
                 self._is_running = True
 
-                logger.info(f"Interactive QA session initialized successfully. Session ID: {self.qa_agent.conversation_history.session_id}")
+                logger.info(
+                    f"Interactive QA session initialized successfully. Session ID: {self.qa_agent.conversation_history.session_id}")
 
             return self
 
@@ -490,35 +429,21 @@ class InteractiveQASession:
                 self.monitor_task = asyncio.create_task(self.monitor.observe())
 
                 self.console.print(
-                    Panel(
-                        f"📁 File monitoring enabled for: {', '.join(str(p) for p in Config.MONITOR_DIRECTORIES)}\n"
-                        f"🔄 Auto-refresh: Every {self.config.auto_save_interval}s",
-                        title="[green]🔍 File Monitor Active",
-                        border_style="green"
-                    )
-                )
+                    Panel(f"📁 File monitoring enabled for: {', '.join(str(p) for p in Config.MONITOR_DIRECTORIES)}\n"
+                          f"🔄 Auto-refresh: Every {self.config.auto_save_interval}s",
+                        title="[green]🔍 File Monitor Active", border_style="green"))
                 logger.info(f"File monitoring started for {len(Config.MONITOR_DIRECTORIES)} directories")
 
             except Exception as e:
                 logger.error(f"Failed to start file monitoring: {e}")
-                self.console.print(
-                    Panel(
-                        f"❌ File monitoring failed to start: {str(e)}\n"
-                        "📝 Session will continue without file monitoring.",
-                        title="[red]🔍 File Monitor Error",
-                        border_style="red"
-                    )
-                )
+                self.console.print(Panel(f"❌ File monitoring failed to start: {str(e)}\n"
+                                         "📝 Session will continue without file monitoring.",
+                    title="[red]🔍 File Monitor Error", border_style="red"))
         else:
-            self.console.print(
-                Panel(
-                    "⚠️ File monitoring is enabled but no MONITOR_DIRECTORIES configured.\n"
-                    "Set MONITOR_DIRECTORIES in your .env file to enable automatic file monitoring.\n"
-                    "📖 Example: MONITOR_DIRECTORIES=/path/to/docs,/path/to/files",
-                    title="[yellow]📁 File Monitor Configuration",
-                    border_style="yellow"
-                )
-            )
+            self.console.print(Panel("⚠️ File monitoring is enabled but no MONITOR_DIRECTORIES configured.\n"
+                                     "Set MONITOR_DIRECTORIES in your .env file to enable automatic file monitoring.\n"
+                                     "📖 Example: MONITOR_DIRECTORIES=/path/to/docs,/path/to/files",
+                title="[yellow]📁 File Monitor Configuration", border_style="yellow"))
 
     async def _start_background_tasks(self):
         """Start background tasks for session management."""
@@ -569,23 +494,14 @@ class InteractiveQASession:
             if self.qa_agent and self.qa_agent.conversation_history.history:
                 try:
                     session_file = self.qa_agent.conversation_history.save_to_file()
-                    self.console.print(
-                        Panel(
-                            f"💾 Session saved to: {session_file}\n"
-                            f"📊 Total exchanges: {len(self.qa_agent.conversation_history.history)}",
-                            title="[green]💾 Session Saved",
-                            border_style="green"
-                        )
-                    )
+                    self.console.print(Panel(f"💾 Session saved to: {session_file}\n"
+                                             f"📊 Total exchanges: {len(self.qa_agent.conversation_history.history)}",
+                        title="[green]💾 Session Saved", border_style="green"))
                 except Exception as e:
                     logger.error(f"Failed to save session: {e}")
 
             # Stop background tasks
-            tasks_to_cancel = [
-                self._auto_save_task,
-                self._health_check_task,
-                self.monitor_task
-            ]
+            tasks_to_cancel = [self._auto_save_task, self._health_check_task, self.monitor_task]
 
             for task in tasks_to_cancel:
                 if task and not task.done():
@@ -597,14 +513,9 @@ class InteractiveQASession:
 
             # Stop file monitoring
             if self.monitor_task:
-                self.console.print(
-                    Panel(
-                        "📁 File monitoring stopped.\n"
-                        "🔄 All monitored files have been processed.",
-                        title="[blue]🔍 File Monitor",
-                        border_style="blue"
-                    )
-                )
+                self.console.print(Panel("📁 File monitoring stopped.\n"
+                                         "🔄 All monitored files have been processed.", title="[blue]🔍 File Monitor",
+                    border_style="blue"))
 
             # Close client connection
             if self.client:
@@ -660,22 +571,18 @@ class InteractiveQASession:
         info_table.add_row("👨‍💻 Author:", "MAXJ")
         info_table.add_row("📦 Version:", "v0.2.0 (Optimized)")
         info_table.add_row("🕒 Started:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        info_table.add_row("🆔 Session:", self.qa_agent.conversation_history.session_id if self.qa_agent else "Initializing...")
+        info_table.add_row("🆔 Session:",
+                           self.qa_agent.conversation_history.session_id if self.qa_agent else "Initializing...")
         info_table.add_row("🧠 Model:", self.model or "Default")
         info_table.add_row("💾 Database:", str(Path(self.db_path).name))
 
         # Features section
         features_text = Text()
         features_text.append("🌟 Enhanced Features:\n", style="bold bright_yellow")
-        features = [
-            "💬 Context-aware conversations with intelligent memory",
-            "🔍 Hybrid search with semantic and keyword matching",
-            "⚡ Smart caching for improved performance",
-            "📊 Real-time performance metrics and analytics",
-            "💾 Automatic session persistence and recovery",
-            "📁 Live file monitoring and auto-indexing",
-            "🎨 Beautiful rich console interface"
-        ]
+        features = ["💬 Context-aware conversations with intelligent memory",
+            "🔍 Hybrid search with semantic and keyword matching", "⚡ Smart caching for improved performance",
+            "📊 Real-time performance metrics and analytics", "💾 Automatic session persistence and recovery",
+            "📁 Live file monitoring and auto-indexing", "🎨 Beautiful rich console interface"]
 
         for feature in features:
             features_text.append(f"   • {feature}\n", style="bright_white")
@@ -686,16 +593,13 @@ class InteractiveQASession:
         commands_table.add_column("Description", style="bright_white")
         commands_table.add_column("Example", style="dim")
 
-        commands_data = [
-            ("💡 /help", "Show comprehensive help guide", "/help"),
+        commands_data = [("💡 /help", "Show comprehensive help guide", "/help"),
             ("📜 /history", "Display conversation history", "/history"),
             ("🧹 /clear", "Clear conversation history", "/clear"),
             ("🔍 /search <query>", "Search documents directly", "/search python tutorial"),
             ("📁 /refresh", "Refresh monitored directories", "/refresh"),
-            ("📊 /stats", "Show session statistics", "/stats"),
-            ("💾 /save", "Save current session", "/save"),
-            ("👋 /quit or /exit", "Exit gracefully", "/quit")
-        ]
+            ("📊 /stats", "Show session statistics", "/stats"), ("💾 /save", "Save current session", "/save"),
+            ("👋 /quit or /exit", "Exit gracefully", "/quit")]
 
         for cmd, desc, example in commands_data:
             commands_table.add_row(cmd, desc, example)
@@ -718,11 +622,13 @@ class InteractiveQASession:
         self.console.print(info_panel)
 
         # Features panel
-        features_panel = Panel(features_text, title="[bold bright_yellow]🌟 Enhanced Features", border_style="bright_yellow")
+        features_panel = Panel(features_text, title="[bold bright_yellow]🌟 Enhanced Features",
+                               border_style="bright_yellow")
         self.console.print(features_panel)
 
         # Commands panel
-        commands_panel = Panel(commands_table, title="[bold bright_cyan]⚡ Command Reference", border_style="bright_cyan")
+        commands_panel = Panel(commands_table, title="[bold bright_cyan]⚡ Command Reference",
+                               border_style="bright_cyan")
         self.console.print(commands_panel)
 
         # Performance panel (if available)
@@ -759,13 +665,8 @@ class InteractiveQASession:
         question_text.append(f"[{timestamp}] Question #{question_count}\n", style="dim")
         question_text.append(question, style="bright_white")
 
-        question_panel = Panel(
-            question_text,
-            title="[bold bright_blue]👤 Your Question",
-            title_align="left",
-            border_style="bright_blue",
-            padding=(0, 1)
-        )
+        question_panel = Panel(question_text, title="[bold bright_blue]👤 Your Question", title_align="left",
+            border_style="bright_blue", padding=(0, 1))
         self.console.print(question_panel)
         self.console.print()
 
@@ -778,22 +679,12 @@ class InteractiveQASession:
 
         # Display answer in a beautiful panel with markdown support
         try:
-            answer_panel = Panel(
-                Markdown(answer),
-                title=f"[bold bright_green]🤖 AI Assistant",
-                title_align="left",
-                border_style="bright_green",
-                padding=(0, 1)
-            )
+            answer_panel = Panel(Markdown(answer), title=f"[bold bright_green]🤖 AI Assistant", title_align="left",
+                border_style="bright_green", padding=(0, 1))
         except Exception:
             # Fallback to plain text if markdown parsing fails
-            answer_panel = Panel(
-                Text(answer, style="bright_white"),
-                title="[bold bright_green]🤖 AI Assistant",
-                title_align="left",
-                border_style="bright_green",
-                padding=(0, 1)
-            )
+            answer_panel = Panel(Text(answer, style="bright_white"), title="[bold bright_green]🤖 AI Assistant",
+                title_align="left", border_style="bright_green", padding=(0, 1))
 
         self.console.print(answer_panel)
 
@@ -809,11 +700,7 @@ class InteractiveQASession:
             return
 
         # Create sources table
-        sources_table = Table(
-            title="📚 Knowledge Sources",
-            show_header=True,
-            header_style="bold bright_yellow"
-        )
+        sources_table = Table(title="📚 Knowledge Sources", show_header=True, header_style="bold bright_yellow")
         sources_table.add_column("Rank", style="bold bright_cyan", width=6)
         sources_table.add_column("Relevance", style="bold", width=12)
         sources_table.add_column("Document", style="bright_blue", width=30)
@@ -844,7 +731,8 @@ class InteractiveQASession:
             # Format document name
             doc_name = "Unknown"
             if hasattr(chunk, 'document_uri') and chunk.document_uri:
-                doc_name = Path(chunk.document_uri).name if chunk.document_uri.startswith('file://') else chunk.document_uri
+                doc_name = Path(chunk.document_uri).name if chunk.document_uri.startswith(
+                    'file://') else chunk.document_uri
                 if len(doc_name) > 25:
                     doc_name = doc_name[:22] + "..."
 
@@ -856,38 +744,23 @@ class InteractiveQASession:
                     preview += "..."
 
             # Add row to table
-            sources_table.add_row(
-                f"{score_icon} #{i}",
-                f"{score:.1%} {score_bar}",
-                doc_name,
-                preview
-            )
+            sources_table.add_row(f"{score_icon} #{i}", f"{score:.1%} {score_bar}", doc_name, preview)
 
         # Add summary row
         sources_table.add_section()
-        sources_table.add_row(
-            "📊 Summary",
-            f"Avg: {avg_score:.1%}",
-            f"{len(search_results)} sources",
-            f"Total relevance: {total_score:.2f}"
-        )
+        sources_table.add_row("📊 Summary", f"Avg: {avg_score:.1%}", f"{len(search_results)} sources",
+            f"Total relevance: {total_score:.2f}")
 
-        sources_panel = Panel(
-            sources_table,
-            title="[bold bright_yellow]📖 Reference Materials",
-            border_style="bright_yellow"
-        )
+        sources_panel = Panel(sources_table, title="[bold bright_yellow]📖 Reference Materials",
+            border_style="bright_yellow")
         self.console.print(sources_panel)
 
     async def _handle_search_command(self, query: str):
         """Handle direct search command with enhanced display and analytics."""
         if not query.strip():
-            error_panel = Panel(
-                "[red]❌ Please provide a search query after /search command.\n"
-                "💡 Example: /search python tutorial[/red]",
-                title="[red]⚠️ Invalid Command",
-                border_style="red"
-            )
+            error_panel = Panel("[red]❌ Please provide a search query after /search command.\n"
+                                "💡 Example: /search python tutorial[/red]", title="[red]⚠️ Invalid Command",
+                border_style="red")
             self.console.print(error_panel)
             return
 
@@ -905,12 +778,9 @@ class InteractiveQASession:
                 results = await self.client.search(query, limit=self.config.search_limit)
             except Exception as e:
                 logger.error(f"Search failed: {e}")
-                error_panel = Panel(
-                    f"[red]❌ Search failed: {str(e)}\n"
-                    "🔧 Please try again or check your database connection.[/red]",
-                    title="[red]🔍 Search Error",
-                    border_style="red"
-                )
+                error_panel = Panel(f"[red]❌ Search failed: {str(e)}\n"
+                                    "🔧 Please try again or check your database connection.[/red]",
+                    title="[red]🔍 Search Error", border_style="red")
                 self.console.print(error_panel)
                 return
 
@@ -920,16 +790,13 @@ class InteractiveQASession:
         search_time = time.time() - start_time
 
         if not results:
-            no_results_panel = Panel(
-                "🚫 No matching documents found.\n\n"
-                "💡 Try these suggestions:\n"
-                "   • Use different keywords\n"
-                "   • Check spelling\n"
-                "   • Use broader search terms\n"
-                "   • Try synonyms or related terms",
-                title="[yellow]📭 No Results Found",
-                border_style="yellow"
-            )
+            no_results_panel = Panel("🚫 No matching documents found.\n\n"
+                                     "💡 Try these suggestions:\n"
+                                     "   • Use different keywords\n"
+                                     "   • Check spelling\n"
+                                     "   • Use broader search terms\n"
+                                     "   • Try synonyms or related terms", title="[yellow]📭 No Results Found",
+                border_style="yellow")
             self.console.print(no_results_panel)
             return
 
@@ -939,11 +806,8 @@ class InteractiveQASession:
     def _display_search_results_table(self, results: List, query: str, search_time: float):
         """Display search results in an enhanced table format."""
         # Create results table
-        results_table = Table(
-            title=f"🔍 Search Results for: '{query}' ({len(results)} found in {search_time:.2f}s)",
-            show_header=True,
-            header_style="bold bright_green"
-        )
+        results_table = Table(title=f"🔍 Search Results for: '{query}' ({len(results)} found in {search_time:.2f}s)",
+            show_header=True, header_style="bold bright_green")
         results_table.add_column("Rank", style="bold bright_cyan", width=6)
         results_table.add_column("Score", style="bold", width=15)
         results_table.add_column("Document", style="bright_blue", width=25)
@@ -1001,43 +865,28 @@ class InteractiveQASession:
                         preview = preview.replace(word.capitalize(), f"[bold yellow]{word.capitalize()}[/bold yellow]")
 
             # Add row to table
-            results_table.add_row(
-                f"{score_icon} #{i}",
-                f"{score:.3f}\n{score_bar}",
-                doc_name,
-                preview
-            )
+            results_table.add_row(f"{score_icon} #{i}", f"{score:.3f}\n{score_bar}", doc_name, preview)
 
         # Add summary section
         results_table.add_section()
-        results_table.add_row(
-            "📊",
-            f"Max: {max_score:.3f}\nAvg: {avg_score:.3f}",
-            f"{len(results)} documents",
-            f"Search completed in {search_time:.2f} seconds"
-        )
+        results_table.add_row("📊", f"Max: {max_score:.3f}\nAvg: {avg_score:.3f}", f"{len(results)} documents",
+            f"Search completed in {search_time:.2f} seconds")
 
         # Display the table
-        results_panel = Panel(
-            results_table,
-            title="[bright_green]🔍 Enhanced Search Results",
-            border_style="bright_green"
-        )
+        results_panel = Panel(results_table, title="[bright_green]🔍 Enhanced Search Results",
+            border_style="bright_green")
         self.console.print(results_panel)
 
     async def _handle_refresh_command(self):
         """Handle refresh command to scan monitored directories with enhanced progress tracking."""
         if not self.monitor:
-            no_monitor_panel = Panel(
-                "⚠️ File monitoring is not enabled or no directories are configured.\n\n"
-                "📝 To enable file monitoring:\n"
-                "   1. Set MONITOR_DIRECTORIES in your .env file\n"
-                "   2. Example: MONITOR_DIRECTORIES=/path/to/docs,/path/to/files\n"
-                "   3. Restart the session\n\n"
-                "💡 File monitoring allows automatic indexing of new and updated files.",
-                title="[yellow]📁 File Monitor Not Available",
-                border_style="yellow"
-            )
+            no_monitor_panel = Panel("⚠️ File monitoring is not enabled or no directories are configured.\n\n"
+                                     "📝 To enable file monitoring:\n"
+                                     "   1. Set MONITOR_DIRECTORIES in your .env file\n"
+                                     "   2. Example: MONITOR_DIRECTORIES=/path/to/docs,/path/to/files\n"
+                                     "   3. Restart the session\n\n"
+                                     "💡 File monitoring allows automatic indexing of new and updated files.",
+                title="[yellow]📁 File Monitor Not Available", border_style="yellow")
             self.console.print(no_monitor_panel)
             return
 
@@ -1060,30 +909,24 @@ class InteractiveQASession:
 
                 refresh_time = time.time() - start_time
 
-                success_panel = Panel(
-                    f"✅ Directory refresh completed successfully!\n"
-                    f"📄 All new and updated files have been processed and indexed.\n"
-                    f"⏱️ Refresh completed in {refresh_time:.2f} seconds\n"
-                    f"📁 Monitored directories: {total_dirs}",
-                    title="[green]🔄 Refresh Complete",
-                    border_style="green"
-                )
+                success_panel = Panel(f"✅ Directory refresh completed successfully!\n"
+                                      f"📄 All new and updated files have been processed and indexed.\n"
+                                      f"⏱️ Refresh completed in {refresh_time:.2f} seconds\n"
+                                      f"📁 Monitored directories: {total_dirs}", title="[green]🔄 Refresh Complete",
+                    border_style="green")
                 self.console.print(success_panel)
 
                 logger.info(f"Directory refresh completed in {refresh_time:.2f}s")
 
             except Exception as e:
                 logger.error(f"Refresh failed: {e}")
-                error_panel = Panel(
-                    f"❌ Error during refresh: {str(e)}\n\n"
-                    "🔧 Troubleshooting steps:\n"
-                    "   • Check MONITOR_DIRECTORIES configuration\n"
-                    "   • Verify directory permissions\n"
-                    "   • Ensure directories exist\n"
-                    "   • Check disk space availability",
-                    title="[red]🔄 Refresh Failed",
-                    border_style="red"
-                )
+                error_panel = Panel(f"❌ Error during refresh: {str(e)}\n\n"
+                                    "🔧 Troubleshooting steps:\n"
+                                    "   • Check MONITOR_DIRECTORIES configuration\n"
+                                    "   • Verify directory permissions\n"
+                                    "   • Ensure directories exist\n"
+                                    "   • Check disk space availability", title="[red]🔄 Refresh Failed",
+                    border_style="red")
                 self.console.print(error_panel)
 
     async def _handle_stats_command(self):
@@ -1102,7 +945,8 @@ class InteractiveQASession:
 
         # Session info
         stats_table.add_row("🕒 Session", "Duration", f"{session_duration:.1f} seconds")
-        stats_table.add_row("", "Started", datetime.fromtimestamp(self._session_start_time).strftime("%Y-%m-%d %H:%M:%S"))
+        stats_table.add_row("", "Started",
+                            datetime.fromtimestamp(self._session_start_time).strftime("%Y-%m-%d %H:%M:%S"))
         stats_table.add_row("", "Session ID", metrics.get("session_id", "N/A"))
 
         # Performance metrics
@@ -1130,12 +974,9 @@ class InteractiveQASession:
     async def _handle_save_command(self):
         """Handle manual session save command."""
         if not self.qa_agent or not self.qa_agent.conversation_history.history:
-            no_data_panel = Panel(
-                "📝 No conversation data to save yet.\n"
-                "💡 Start asking questions to build your session history!",
-                title="[yellow]💾 Nothing to Save",
-                border_style="yellow"
-            )
+            no_data_panel = Panel("📝 No conversation data to save yet.\n"
+                                  "💡 Start asking questions to build your session history!",
+                title="[yellow]💾 Nothing to Save", border_style="yellow")
             self.console.print(no_data_panel)
             return
 
@@ -1143,37 +984,28 @@ class InteractiveQASession:
             with self.console.status("[bold bright_blue]💾 Saving session...", spinner="dots"):
                 session_file = self.qa_agent.conversation_history.save_to_file()
 
-            save_panel = Panel(
-                f"✅ Session saved successfully!\n\n"
-                f"📁 File: {session_file}\n"
-                f"📊 Exchanges: {len(self.qa_agent.conversation_history.history)}\n"
-                f"🆔 Session ID: {self.qa_agent.conversation_history.session_id}\n"
-                f"💾 File size: {session_file.stat().st_size} bytes",
-                title="[green]💾 Save Complete",
-                border_style="green"
-            )
+            save_panel = Panel(f"✅ Session saved successfully!\n\n"
+                               f"📁 File: {session_file}\n"
+                               f"📊 Exchanges: {len(self.qa_agent.conversation_history.history)}\n"
+                               f"🆔 Session ID: {self.qa_agent.conversation_history.session_id}\n"
+                               f"💾 File size: {session_file.stat().st_size} bytes", title="[green]💾 Save Complete",
+                border_style="green")
             self.console.print(save_panel)
 
         except Exception as e:
             logger.error(f"Save failed: {e}")
-            error_panel = Panel(
-                f"❌ Failed to save session: {str(e)}\n"
-                "🔧 Please check file permissions and disk space.",
-                title="[red]💾 Save Failed",
-                border_style="red"
-            )
+            error_panel = Panel(f"❌ Failed to save session: {str(e)}\n"
+                                "🔧 Please check file permissions and disk space.", title="[red]💾 Save Failed",
+                border_style="red")
             self.console.print(error_panel)
 
     def _display_history(self):
         """Display conversation history with enhanced table formatting and analytics."""
         if not self.qa_agent.conversation_history.history:
-            no_history_panel = Panel(
-                "📝 No conversation history yet.\n\n"
-                "💡 Start asking questions to build your session history!\n"
-                "🔄 Your conversation context helps me provide better answers.",
-                title="[yellow]📜 Conversation History",
-                border_style="yellow"
-            )
+            no_history_panel = Panel("📝 No conversation history yet.\n\n"
+                                     "💡 Start asking questions to build your session history!\n"
+                                     "🔄 Your conversation context helps me provide better answers.",
+                title="[yellow]📜 Conversation History", border_style="yellow")
             self.console.print(no_history_panel)
             return
 
@@ -1184,9 +1016,7 @@ class InteractiveQASession:
         # Create history table
         history_table = Table(
             title=f"📜 Conversation History ({len(self.qa_agent.conversation_history.history)} exchanges)",
-            show_header=True,
-            header_style="bold bright_blue"
-        )
+            show_header=True, header_style="bold bright_blue")
         history_table.add_column("#", style="bold bright_cyan", width=4)
         history_table.add_column("Time", style="dim", width=10)
         history_table.add_column("Question", style="bright_blue", width=40)
@@ -1226,32 +1056,18 @@ class InteractiveQASession:
             # Response time
             response_text = f"{response_time:.2f}s" if response_time > 0 else "-"
 
-            history_table.add_row(
-                str(i),
-                timestamp,
-                question_preview,
-                answer_preview,
-                source_text,
-                response_text
-            )
+            history_table.add_row(str(i), timestamp, question_preview, answer_preview, source_text, response_text)
 
         # Add summary section
         history_table.add_section()
-        history_table.add_row(
-            "📊",
-            "Summary",
-            f"Session: {str(session_duration).split('.')[0]}",
+        history_table.add_row("📊", "Summary", f"Session: {str(session_duration).split('.')[0]}",
             f"Avg Response: {metrics.get('avg_response_time', 0):.2f}s",
             f"Total: {sum(len(ex.search_results) if hasattr(ex, 'search_results') else len(ex.get('search_results', [])) for ex in self.qa_agent.conversation_history.history)}",
-            f"Cache: {metrics.get('cache_hit_rate', 0):.1f}%"
-        )
+            f"Cache: {metrics.get('cache_hit_rate', 0):.1f}%")
 
         # Display the table
-        history_panel = Panel(
-            history_table,
-            title="[bold bright_blue]📜 Enhanced Conversation History",
-            border_style="bright_blue"
-        )
+        history_panel = Panel(history_table, title="[bold bright_blue]📜 Enhanced Conversation History",
+            border_style="bright_blue")
         self.console.print(history_panel)
 
         # Display additional analytics
@@ -1288,7 +1104,8 @@ class InteractiveQASession:
             avg_response = sum(response_times) / len(response_times)
             fastest = min(response_times)
             slowest = max(response_times)
-            analytics_table.add_row("⏱️ Avg Response Time", f"{avg_response:.2f}s", f"Range: {fastest:.2f}s - {slowest:.2f}s")
+            analytics_table.add_row("⏱️ Avg Response Time", f"{avg_response:.2f}s",
+                                    f"Range: {fastest:.2f}s - {slowest:.2f}s")
 
         if source_counts:
             avg_sources = sum(source_counts) / len(source_counts)
@@ -1296,13 +1113,15 @@ class InteractiveQASession:
 
         if question_lengths:
             avg_q_length = sum(question_lengths) / len(question_lengths)
-            analytics_table.add_row("❓ Avg Question Length", f"{avg_q_length:.0f} chars", "Longer questions often get better answers")
+            analytics_table.add_row("❓ Avg Question Length", f"{avg_q_length:.0f} chars",
+                                    "Longer questions often get better answers")
 
         if answer_lengths:
             avg_a_length = sum(answer_lengths) / len(answer_lengths)
             analytics_table.add_row("💬 Avg Answer Length", f"{avg_a_length:.0f} chars", "Comprehensive responses")
 
-        analytics_panel = Panel(analytics_table, title="[bold bright_magenta]📊 Session Insights", border_style="bright_magenta")
+        analytics_panel = Panel(analytics_table, title="[bold bright_magenta]📊 Session Insights",
+                                border_style="bright_magenta")
         self.console.print(analytics_panel)
 
     def _display_help(self):
@@ -1315,16 +1134,14 @@ class InteractiveQASession:
         commands_table.add_column("Description", style="bright_white", width=35)
         commands_table.add_column("Example", style="dim", width=25)
 
-        commands_data = [
-            ("💡 /help", "Show this comprehensive help guide", "/help"),
+        commands_data = [("💡 /help", "Show this comprehensive help guide", "/help"),
             ("📜 /history", "Display conversation history with analytics", "/history"),
             ("🧹 /clear", "Clear conversation history and context", "/clear"),
             ("🔍 /search <query>", "Search documents directly with highlighting", "/search python tutorial"),
             ("📁 /refresh", "Refresh monitored directories", "/refresh"),
             ("📊 /stats", "Show detailed session statistics", "/stats"),
             ("💾 /save", "Manually save current session", "/save"),
-            ("👋 /quit or /exit", "Exit gracefully with auto-save", "/quit")
-        ]
+            ("👋 /quit or /exit", "Exit gracefully with auto-save", "/quit")]
 
         for cmd, desc, example in commands_data:
             commands_table.add_row(cmd, desc, example)
@@ -1334,16 +1151,14 @@ class InteractiveQASession:
         tips_table.add_column("Tip", style="bold bright_white", width=25)
         tips_table.add_column("Description", style="bright_white", width=50)
 
-        tips_data = [
-            ("🧠 Context Awareness", "I remember our conversation! Ask follow-up questions naturally."),
+        tips_data = [("🧠 Context Awareness", "I remember our conversation! Ask follow-up questions naturally."),
             ("🎯 Be Specific", "Detailed questions with context get better, more accurate answers."),
             ("🔍 Explore First", "Use /search to discover available documents and topics."),
             ("⚡ Hybrid Search", "I use both semantic understanding and keyword matching."),
             ("📚 Source Transparency", "I always show which documents informed my answers."),
             ("🔄 Iterative Refinement", "Refine questions based on my responses for deeper insights."),
             ("📊 Use Analytics", "Check /stats and /history for performance insights."),
-            ("💾 Save Sessions", "Use /save to preserve important conversations.")
-        ]
+            ("💾 Save Sessions", "Use /save to preserve important conversations.")]
 
         for tip, desc in tips_data:
             tips_table.add_row(tip, desc)
@@ -1354,14 +1169,12 @@ class InteractiveQASession:
         tech_table.add_column("Specification", style="bright_white", width=30)
         tech_table.add_column("Details", style="dim", width=25)
 
-        tech_data = [
-            ("🔧 Search Algorithm", "Hybrid (Vector + Full-text)", "Best of both worlds"),
+        tech_data = [("🔧 Search Algorithm", "Hybrid (Vector + Full-text)", "Best of both worlds"),
             ("🧮 Context Window", f"Up to {self.config.max_context_length} characters", "Intelligent truncation"),
             ("📝 History Limit", f"Last {self.config.max_history} exchanges", "Configurable retention"),
             ("🎯 Search Results", f"Top {self.config.search_limit} documents", "Relevance-ranked"),
             ("💾 Cache Size", f"{self.config.cache_size} entries", "Performance optimization"),
-            ("🔄 Auto-save", f"Every {self.config.auto_save_interval}s", "Automatic persistence")
-        ]
+            ("🔄 Auto-save", f"Every {self.config.auto_save_interval}s", "Automatic persistence")]
 
         for component, spec, detail in tech_data:
             tech_table.add_row(component, spec, detail)
@@ -1370,8 +1183,7 @@ class InteractiveQASession:
         help_panels = [
             Panel(commands_table, title="[bold bright_yellow]📖 Command Reference", border_style="bright_yellow"),
             Panel(tips_table, title="[bold bright_green]🌟 Usage Tips", border_style="bright_green"),
-            Panel(tech_table, title="[bold bright_purple]🔧 Technical Details", border_style="bright_purple")
-        ]
+            Panel(tech_table, title="[bold bright_purple]🔧 Technical Details", border_style="bright_purple")]
 
         for panel in help_panels:
             self.console.print(panel)
@@ -1394,14 +1206,9 @@ class InteractiveQASession:
         self._display_welcome()
 
         # Command mapping for better organization
-        command_handlers = {
-            "/help": self._display_help,
-            "/history": self._display_history,
-            "/clear": self._handle_clear_command,
-            "/refresh": self._handle_refresh_command,
-            "/stats": self._handle_stats_command,
-            "/save": self._handle_save_command,
-        }
+        command_handlers = {"/help": self._display_help, "/history": self._display_history,
+            "/clear": self._handle_clear_command, "/refresh": self._handle_refresh_command,
+            "/stats": self._handle_stats_command, "/save": self._handle_save_command, }
 
         while self._is_running:
             try:
@@ -1456,28 +1263,21 @@ class InteractiveQASession:
     async def _handle_clear_command(self):
         """Handle clear command with confirmation."""
         if not self.qa_agent.conversation_history.history:
-            no_history_panel = Panel(
-                "📝 No conversation history to clear.",
-                title="[yellow]🧹 Nothing to Clear",
-                border_style="yellow"
-            )
+            no_history_panel = Panel("📝 No conversation history to clear.", title="[yellow]🧹 Nothing to Clear",
+                border_style="yellow")
             self.console.print(no_history_panel)
             return
 
         # Ask for confirmation
         confirm = Confirm.ask(
-            f"[yellow]Are you sure you want to clear {len(self.qa_agent.conversation_history.history)} conversation exchanges?[/yellow]"
-        )
+            f"[yellow]Are you sure you want to clear {len(self.qa_agent.conversation_history.history)} conversation exchanges?[/yellow]")
 
         if confirm:
             self.qa_agent.conversation_history.clear()
-            clear_panel = Panel(
-                "🧹 Conversation history has been cleared successfully!\n"
-                "✨ Starting fresh with a clean slate.\n"
-                "🧠 Context memory has been reset.",
-                title="[bold bright_green]✅ History Cleared",
-                border_style="bright_green"
-            )
+            clear_panel = Panel("🧹 Conversation history has been cleared successfully!\n"
+                                "✨ Starting fresh with a clean slate.\n"
+                                "🧠 Context memory has been reset.", title="[bold bright_green]✅ History Cleared",
+                border_style="bright_green")
             self.console.print(clear_panel)
             logger.info("Conversation history cleared by user")
         else:
@@ -1492,15 +1292,14 @@ class InteractiveQASession:
             summary_text = Text()
             summary_text.append("📊 Session Summary:\n", style="bold bright_cyan")
             summary_text.append(f"   • Questions asked: {metrics.get('total_questions', 0)}\n", style="bright_white")
-            summary_text.append(f"   • Average response time: {metrics.get('avg_response_time', 0):.2f}s\n", style="bright_white")
+            summary_text.append(f"   • Average response time: {metrics.get('avg_response_time', 0):.2f}s\n",
+                                style="bright_white")
             summary_text.append(f"   • Cache hit rate: {metrics.get('cache_hit_rate', 0):.1f}%\n", style="bright_white")
-            summary_text.append(f"   • Session duration: {time.time() - self._session_start_time:.1f}s\n", style="bright_white")
+            summary_text.append(f"   • Session duration: {time.time() - self._session_start_time:.1f}s\n",
+                                style="bright_white")
 
-            goodbye_panel = Panel(
-                summary_text,
-                title="[bold bright_yellow]👋 Session Complete!",
-                border_style="bright_yellow"
-            )
+            goodbye_panel = Panel(summary_text, title="[bold bright_yellow]👋 Session Complete!",
+                border_style="bright_yellow")
             self.console.print(goodbye_panel)
 
         # Final goodbye message
@@ -1509,11 +1308,7 @@ class InteractiveQASession:
         farewell_text.append("💫 Hope you found the answers you were looking for.\n", style="bright_white")
         farewell_text.append("🚀 Come back anytime for more insights!", style="bright_white")
 
-        farewell_panel = Panel(
-            farewell_text,
-            title="[bold bright_yellow]🎉 Goodbye!",
-            border_style="bright_yellow"
-        )
+        farewell_panel = Panel(farewell_text, title="[bold bright_yellow]🎉 Goodbye!", border_style="bright_yellow")
         self.console.print(farewell_panel)
 
         return True
@@ -1545,11 +1340,7 @@ class InteractiveQASession:
 
         error_text.append("\n📖 Type /help for complete command reference", style="dim")
 
-        error_panel = Panel(
-            error_text,
-            title="[red]⚠️ Command Not Found",
-            border_style="red"
-        )
+        error_panel = Panel(error_text, title="[red]⚠️ Command Not Found", border_style="red")
         self.console.print(error_panel)
 
     async def _process_question(self, question: str):
@@ -1587,9 +1378,7 @@ class InteractiveQASession:
             self._performance_metrics["successful_queries"] += 1
             self._performance_metrics["total_response_time"] += response_time
             self._performance_metrics["avg_response_time"] = (
-                self._performance_metrics["total_response_time"] /
-                self._performance_metrics["successful_queries"]
-            )
+                    self._performance_metrics["total_response_time"] / self._performance_metrics["successful_queries"])
 
             # Display answer with response time
             self._display_answer(answer, search_results, response_time)
@@ -1609,11 +1398,7 @@ class InteractiveQASession:
             error_text.append("   • Try a simpler question first\n", style="bright_white")
             error_text.append("\n💡 Type /help for guidance or /stats for system status", style="dim")
 
-            error_panel = Panel(
-                error_text,
-                title="[red]⚠️ Processing Error",
-                border_style="red"
-            )
+            error_panel = Panel(error_text, title="[red]⚠️ Processing Error", border_style="red")
             self.console.print(error_panel)
 
     async def _handle_keyboard_interrupt(self) -> bool:
@@ -1625,11 +1410,7 @@ class InteractiveQASession:
         interrupt_text.append("   • Type 'quit' to exit\n", style="bright_white")
         interrupt_text.append("   • Type 'save' to save and continue\n", style="bright_white")
 
-        interrupt_panel = Panel(
-            interrupt_text,
-            title="[yellow]🛑 Interrupted",
-            border_style="yellow"
-        )
+        interrupt_panel = Panel(interrupt_text, title="[yellow]🛑 Interrupted", border_style="yellow")
         self.console.print(interrupt_panel)
 
         try:
@@ -1675,21 +1456,12 @@ class InteractiveQASession:
 
         error_text.append("\n💡 Session will continue. Type /help for assistance.", style="dim")
 
-        error_panel = Panel(
-            error_text,
-            title="[red]⚠️ Session Error",
-            border_style="red"
-        )
+        error_panel = Panel(error_text, title="[red]⚠️ Session Error", border_style="red")
         self.console.print(error_panel)
 
 
-async def start_interactive_qa(
-    db_path: str,
-    model: str = "",
-    enable_monitoring: bool = True,
-    config: Optional[SessionConfig] = None,
-    session_id: Optional[str] = None
-) -> None:
+async def start_interactive_qa(db_path: str, model: str = "", enable_monitoring: bool = True,
+        config: Optional[SessionConfig] = None, session_id: Optional[str] = None) -> None:
     """
     Start an enhanced interactive QA session with comprehensive features.
 
@@ -1714,21 +1486,12 @@ async def start_interactive_qa(
         startup_text.append(f"📊 Monitoring: {'Enabled' if enable_monitoring else 'Disabled'}\n", style="bright_white")
         startup_text.append(f"⚙️ Config: Optimized for performance\n", style="bright_white")
 
-        startup_panel = Panel(
-            startup_text,
-            title="[bold bright_blue]🔧 Initialization",
-            border_style="bright_blue"
-        )
+        startup_panel = Panel(startup_text, title="[bold bright_blue]🔧 Initialization", border_style="bright_blue")
         console.print(startup_panel)
 
         # Start the session
-        async with InteractiveQASession(
-            db_path=db_path,
-            model=model,
-            enable_monitoring=enable_monitoring,
-            config=session_config,
-            session_id=session_id
-        ) as session:
+        async with InteractiveQASession(db_path=db_path, model=model, enable_monitoring=enable_monitoring,
+                config=session_config, session_id=session_id) as session:
             await session.run()
 
     except KeyboardInterrupt:
@@ -1744,21 +1507,13 @@ async def start_interactive_qa(
         error_text.append("   • Ensure all dependencies are installed\n", style="bright_white")
         error_text.append("   • Check system resources\n", style="bright_white")
 
-        error_panel = Panel(
-            error_text,
-            title="[red]⚠️ Startup Error",
-            border_style="red"
-        )
+        error_panel = Panel(error_text, title="[red]⚠️ Startup Error", border_style="red")
         console.print(error_panel)
         raise
 
 
-async def interactive_qa_cli(
-    db_path: str,
-    model: str = "",
-    enable_monitoring: bool = True,
-    config_file: Optional[str] = None
-) -> None:
+async def interactive_qa_cli(db_path: str, model: str = "", enable_monitoring: bool = True,
+        config_file: Optional[str] = None) -> None:
     """
     Enhanced CLI wrapper for interactive QA with configuration support.
 
@@ -1783,12 +1538,8 @@ async def interactive_qa_cli(
                 console.print(f"[yellow]⚠️ Failed to load config file: {e}. Using defaults.[/yellow]")
 
         # Start the session
-        await start_interactive_qa(
-            db_path=db_path,
-            model=model,
-            enable_monitoring=enable_monitoring,
-            config=session_config
-        )
+        await start_interactive_qa(db_path=db_path, model=model, enable_monitoring=enable_monitoring,
+            config=session_config)
 
     except Exception as e:
         logger.error(f"CLI error: {e}")
@@ -1828,51 +1579,23 @@ if __name__ == "__main__":
     """Enhanced command line interface with argument parsing."""
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Enhanced Interactive QA System for HKEX Announcements",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+    parser = argparse.ArgumentParser(description="Enhanced Interactive QA System for HKEX Announcements",
+        formatter_class=argparse.RawDescriptionHelpFormatter, epilog="""
 Examples:
   python interactive.py                          # Use default database
   python interactive.py mydata.db               # Use specific database
   python interactive.py mydata.db gpt-4         # Use specific model
   python interactive.py --no-monitoring         # Disable file monitoring
   python interactive.py --config config.json    # Use custom configuration
-        """
-    )
+        """)
 
-    parser.add_argument(
-        "db_path",
-        nargs="?",
-        default="haiku.rag.sqlite",
-        help="Path to the database file (default: haiku.rag.sqlite)"
-    )
-    parser.add_argument(
-        "model",
-        nargs="?",
-        default="",
-        help="Model name to use for QA (default: from config)"
-    )
-    parser.add_argument(
-        "--no-monitoring",
-        action="store_true",
-        help="Disable file monitoring"
-    )
-    parser.add_argument(
-        "--config",
-        type=str,
-        help="Path to configuration file"
-    )
-    parser.add_argument(
-        "--session-id",
-        type=str,
-        help="Resume a specific session by ID"
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable debug logging"
-    )
+    parser.add_argument("db_path", nargs="?", default="haiku.rag.sqlite",
+        help="Path to the database file (default: haiku.rag.sqlite)")
+    parser.add_argument("model", nargs="?", default="", help="Model name to use for QA (default: from config)")
+    parser.add_argument("--no-monitoring", action="store_true", help="Disable file monitoring")
+    parser.add_argument("--config", type=str, help="Path to configuration file")
+    parser.add_argument("--session-id", type=str, help="Resume a specific session by ID")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
     args = parser.parse_args()
 
@@ -1883,12 +1606,8 @@ Examples:
 
     # Run the interactive session
     try:
-        asyncio.run(interactive_qa_cli(
-            db_path=args.db_path,
-            model=args.model,
-            enable_monitoring=not args.no_monitoring,
-            config_file=args.config
-        ))
+        asyncio.run(interactive_qa_cli(db_path=args.db_path, model=args.model, enable_monitoring=not args.no_monitoring,
+            config_file=args.config))
     except KeyboardInterrupt:
         print("\n👋 Goodbye!")
     except Exception as e:
