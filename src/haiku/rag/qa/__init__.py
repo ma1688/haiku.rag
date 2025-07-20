@@ -10,8 +10,26 @@ def get_qa_agent(client: HaikuRAG, model: str = "") -> QuestionAnswerAgentBase:
     """
     # Check if financial QA is enabled
     if Config.USE_FINANCIAL_QA:
-        from haiku.rag.domains.financial.qa import FinancialQuestionAnswerAgent
-        return FinancialQuestionAnswerAgent(client)
+        # Choose the appropriate financial QA agent based on provider
+        if Config.QA_PROVIDER == "openai":
+            try:
+                from haiku.rag.domains.financial.qa import FinancialQuestionAnswerOpenAIAgent
+                return FinancialQuestionAnswerOpenAIAgent(client, model or Config.FINANCIAL_QA_MODEL or Config.QA_MODEL)
+            except ImportError:
+                raise ImportError(
+                    "Financial OpenAI QA agent requires the 'openai' package. "
+                    "Please install haiku.rag with the 'openai' extra:"
+                    "uv pip install haiku.rag --extra openai"
+                )
+        elif Config.QA_PROVIDER == "anthropic":
+            # For now, fallback to basic financial agent for Anthropic
+            # TODO: Implement FinancialQuestionAnswerAnthropicAgent
+            from haiku.rag.domains.financial.qa import FinancialQuestionAnswerAgent
+            return FinancialQuestionAnswerAgent(client)
+        else:
+            # Fallback to basic financial agent (Ollama or basic)
+            from haiku.rag.domains.financial.qa import FinancialQuestionAnswerAgent
+            return FinancialQuestionAnswerAgent(client)
     
     # Standard QA agents
     if Config.QA_PROVIDER == "ollama":
