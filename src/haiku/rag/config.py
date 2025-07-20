@@ -22,8 +22,8 @@ class AppConfig(BaseModel):
     QA_PROVIDER: str = "ollama"
     QA_MODEL: str = "qwen3"
 
-    CHUNK_SIZE: int = 256
-    CHUNK_OVERLAP: int = 32
+    CHUNK_SIZE: int = 1024  # Much larger for better context retention
+    CHUNK_OVERLAP: int = 256  # Larger overlap for better continuity
 
     OLLAMA_BASE_URL: str = "http://localhost:11434"
 

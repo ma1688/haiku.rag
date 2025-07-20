@@ -3,6 +3,7 @@ import re
 
 from haiku.rag.chunker import chunker
 from haiku.rag.embeddings import get_embedder
+from haiku.rag.query_processor import query_processor
 from haiku.rag.store.models.chunk import Chunk
 from haiku.rag.store.repositories.base import BaseRepository
 
@@ -243,17 +244,21 @@ class ChunkRepository(BaseRepository[Chunk]):
     async def search_chunks(
         self, query: str, limit: int = 5
     ) -> list[tuple[Chunk, float]]:
-        """Search for relevant chunks using vector similarity."""
+        """Search for relevant chunks using vector similarity with query processing."""
         if self.store._connection is None:
             raise ValueError("Store connection is not available")
 
         cursor = self.store._connection.cursor()
 
-        # Generate embedding for the query
-        query_embedding = await self.embedder.embed(query)
+        # Process query for better vector search
+        processed_query = query_processor.process_for_vector(query)
+
+        # Generate embedding for the processed query
+        query_embedding = await self.embedder.embed(processed_query)
         serialized_query_embedding = self.store.serialize_embedding(query_embedding)
 
-        # Search for similar chunks using sqlite-vec
+        # Search for similar chunks using sqlite-vec with much expanded limit for better recall
+        search_limit = min(limit * 10, 100)  # Search many more candidates initially
         cursor.execute(
             """
             SELECT c.id, c.document_id, c.content, c.metadata, distance, d.uri, d.metadata as document_metadata
@@ -263,12 +268,36 @@ class ChunkRepository(BaseRepository[Chunk]):
             WHERE embedding MATCH :embedding AND k = :k
             ORDER BY distance
             """,
-            {"embedding": serialized_query_embedding, "k": limit},
+            {"embedding": serialized_query_embedding, "k": search_limit},
         )
 
         results = cursor.fetchall()
-        return [
-            (
+
+        # Apply relevance filtering and re-ranking
+        filtered_results = []
+        for chunk_id, document_id, content, metadata_json, distance, document_uri, document_metadata_json in results:
+            # Calculate relevance score (lower distance = higher relevance)
+            relevance_score = 1.0 / (1.0 + distance)
+
+            # Apply aggressive keyword matching boost
+            keywords = query_processor.extract_keywords(query)
+            keyword_boost = 0.0
+            content_lower = content.lower()
+            for keyword in keywords:
+                if keyword.lower() in content_lower:
+                    # Higher boost for exact matches
+                    keyword_boost += 0.3
+                    # Extra boost for numbers (like stock codes)
+                    if keyword.isdigit():
+                        keyword_boost += 0.5
+                # Partial matching for Chinese characters
+                elif len(keyword) == 1 and '\u4e00' <= keyword <= '\u9fff':
+                    if keyword in content:  # Case sensitive for Chinese
+                        keyword_boost += 0.2
+
+            final_score = relevance_score + keyword_boost
+
+            filtered_results.append((
                 Chunk(
                     id=chunk_id,
                     document_id=document_id,
@@ -279,44 +308,91 @@ class ChunkRepository(BaseRepository[Chunk]):
                     if document_metadata_json
                     else {},
                 ),
-                1.0 / (1.0 + distance),
-            )
-            for chunk_id, document_id, content, metadata_json, distance, document_uri, document_metadata_json in results
-        ]
+                final_score,
+            ))
+
+        # Sort by final score and return top results
+        filtered_results.sort(key=lambda x: x[1], reverse=True)
+        return filtered_results[:limit]
 
     async def search_chunks_fts(
         self, query: str, limit: int = 5
     ) -> list[tuple[Chunk, float]]:
-        """Search for chunks using FTS5 full-text search."""
+        """Search for chunks using FTS5 full-text search with improved query processing."""
         if self.store._connection is None:
             raise ValueError("Store connection is not available")
 
         cursor = self.store._connection.cursor()
 
-        # Clean the query for FTS5 - extract keywords for better matching
-        # Remove special characters and split into words
-        words = re.findall(r"\b\w+\b", query.lower())
-        # Join with OR to find chunks containing any of the keywords
-        fts_query = " OR ".join(words) if words else query
+        # Use improved query processing for FTS
+        fts_query = query_processor.process_for_fts(query)
 
-        # Search using FTS5
-        cursor.execute(
-            """
-            SELECT c.id, c.document_id, c.content, c.metadata, rank, d.uri, d.metadata as document_metadata
-            FROM chunks_fts
-            JOIN chunks c ON c.id = chunks_fts.rowid
-            JOIN documents d ON c.document_id = d.id
-            WHERE chunks_fts MATCH :query
-            ORDER BY rank
-            LIMIT :limit
-            """,
-            {"query": fts_query, "limit": limit},
-        )
+        # Expand search limit for much better recall
+        search_limit = min(limit * 5, 50)
 
-        results = cursor.fetchall()
+        # Search using FTS5 with multiple query strategies
+        results = []
 
-        return [
-            (
+        # Strategy 1: Use processed FTS query
+        try:
+            cursor.execute(
+                """
+                SELECT c.id, c.document_id, c.content, c.metadata, rank, d.uri, d.metadata as document_metadata
+                FROM chunks_fts
+                JOIN chunks c ON c.id = chunks_fts.rowid
+                JOIN documents d ON c.document_id = d.id
+                WHERE chunks_fts MATCH :query
+                ORDER BY rank
+                LIMIT :limit
+                """,
+                {"query": fts_query, "limit": search_limit},
+            )
+            results.extend(cursor.fetchall())
+        except Exception:
+            # Fallback to simple keyword search if FTS query fails
+            keywords = query_processor.extract_keywords(query)
+            if keywords:
+                simple_query = " OR ".join(keywords)
+                cursor.execute(
+                    """
+                    SELECT c.id, c.document_id, c.content, c.metadata, rank, d.uri, d.metadata as document_metadata
+                    FROM chunks_fts
+                    JOIN chunks c ON c.id = chunks_fts.rowid
+                    JOIN documents d ON c.document_id = d.id
+                    WHERE chunks_fts MATCH :query
+                    ORDER BY rank
+                    LIMIT :limit
+                    """,
+                    {"query": simple_query, "limit": search_limit},
+                )
+                results.extend(cursor.fetchall())
+
+        # Remove duplicates and process results
+        seen_chunks = set()
+        unique_results = []
+        for result in results:
+            chunk_id = result[0]
+            if chunk_id not in seen_chunks:
+                seen_chunks.add(chunk_id)
+                unique_results.append(result)
+
+        # Apply additional scoring and filtering
+        scored_results = []
+        for chunk_id, document_id, content, metadata_json, rank, document_uri, document_metadata_json in unique_results:
+            # FTS5 rank is negative BM25 score, convert to positive
+            base_score = -rank
+
+            # Apply keyword matching boost
+            keywords = query_processor.extract_keywords(query)
+            keyword_boost = 0.0
+            content_lower = content.lower()
+            for keyword in keywords:
+                if keyword.lower() in content_lower:
+                    keyword_boost += 0.2  # Higher boost for FTS as it's keyword-based
+
+            final_score = base_score + keyword_boost
+
+            scored_results.append((
                 Chunk(
                     id=chunk_id,
                     document_id=document_id,
@@ -327,30 +403,32 @@ class ChunkRepository(BaseRepository[Chunk]):
                     if document_metadata_json
                     else {},
                 ),
-                -rank,
-            )
-            for chunk_id, document_id, content, metadata_json, rank, document_uri, document_metadata_json in results
-            # FTS5 rank is negative BM25 score
-        ]
+                final_score,
+            ))
+
+        # Sort by final score and return top results
+        scored_results.sort(key=lambda x: x[1], reverse=True)
+        return scored_results[:limit]
 
     async def search_chunks_hybrid(
         self, query: str, limit: int = 5, k: int = 60
     ) -> list[tuple[Chunk, float]]:
-        """Hybrid search using Reciprocal Rank Fusion (RRF) combining vector similarity and FTS5 full-text search."""
+        """Enhanced hybrid search using improved RRF combining vector similarity and FTS5 full-text search."""
         if self.store._connection is None:
             raise ValueError("Store connection is not available")
 
         cursor = self.store._connection.cursor()
 
-        # Generate embedding for the query
-        query_embedding = await self.embedder.embed(query)
+        # Process query for different search methods
+        query_variations = query_processor.get_search_variations(query)
+
+        # Generate embedding for the processed vector query
+        vector_query = query_variations['vector']
+        query_embedding = await self.embedder.embed(vector_query)
         serialized_query_embedding = self.store.serialize_embedding(query_embedding)
 
-        # Clean the query for FTS5 - extract keywords for better matching
-        # Remove special characters and split into words
-        words = re.findall(r"\b\w+\b", query.lower())
-        # Join with OR to find chunks containing any of the keywords
-        fts_query = " OR ".join(words) if words else query
+        # Use processed FTS query
+        fts_query = query_variations['fts']
         # Perform hybrid search using RRF (Reciprocal Rank Fusion)
         cursor.execute(
             """

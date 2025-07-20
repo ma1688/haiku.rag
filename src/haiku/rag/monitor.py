@@ -40,10 +40,31 @@ class FileWatcher:
                 await self._delete_document(Path(path))
 
     async def refresh(self):
+        """Refresh all monitored directories by scanning for new/updated files."""
+        import asyncio
+
+        files_to_process = []
         for path in self.paths:
             for f in Path(path).rglob("**/*"):
                 if f.is_file() and f.suffix in FileReader.extensions:
-                    await self._upsert_document(f)
+                    files_to_process.append(f)
+
+        logger.info(f"Found {len(files_to_process)} files to process")
+
+        # Process files sequentially to avoid database transaction conflicts
+        processed = 0
+        errors = 0
+        for f in files_to_process:
+            try:
+                await self._upsert_document(f)
+                processed += 1
+            except Exception as e:
+                logger.error(f"Failed to process {f}: {e}")
+                errors += 1
+                # Continue processing other files
+                continue
+
+        logger.info(f"Refresh completed: {processed} processed, {errors} errors")
 
     async def _upsert_document(self, file: Path) -> Document | None:
         try:

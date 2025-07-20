@@ -7,7 +7,7 @@ Retrieval-Augmented Generation (RAG) library on SQLite.
 ## Features
 
 - **Local SQLite**: No external servers required
-- **Multiple embedding providers**: Ollama, VoyageAI, OpenAI
+- **Multiple embedding providers**: Ollama, VoyageAI, OpenAI, SiliconFlow
 - **Multiple QA providers**: Ollama, OpenAI, Anthropic
 - **Hybrid search**: Vector + full-text search with Reciprocal Rank Fusion
 - **Question answering**: Built-in QA agents on your documents
@@ -15,6 +15,8 @@ Retrieval-Augmented Generation (RAG) library on SQLite.
 - **40+ file formats**: PDF, DOCX, HTML, Markdown, audio, URLs
 - **MCP server**: Expose as tools for AI assistants
 - **CLI & Python API**: Use from command line or Python
+- **Retrieval optimization**: Advanced tools for improving search performance
+- **Chinese text support**: Optimized for Chinese documents and queries
 
 ## Quick Start
 
@@ -34,6 +36,9 @@ haiku-rag ask "Who is the author of haiku.rag?"
 
 # Rebuild database (re-chunk and re-embed all documents)
 haiku-rag rebuild
+
+# Optimize retrieval performance
+python scripts/retrieval_optimizer.py database.db
 
 # Start server with file monitoring
 export MONITOR_DIRECTORIES="/path/to/docs"
@@ -77,4 +82,5 @@ Full documentation at: https://ggozad.github.io/haiku.rag/
 - [Configuration](https://ggozad.github.io/haiku.rag/configuration/) - Environment variables
 - [CLI](https://ggozad.github.io/haiku.rag/cli/) - Command reference
 - [Python API](https://ggozad.github.io/haiku.rag/python/) - Complete API docs
+- [Retrieval Optimization](docs/retrieval_optimization.md) - Improve search performance
 - [Benchmarks](https://ggozad.github.io/haiku.rag/benchmarks/) - Performance Benchmarks

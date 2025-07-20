@@ -23,6 +23,17 @@ try:
             ]
 
         async def answer(self, question: str) -> str:
+            # 优先使用规则基础的股票查询处理器
+            try:
+                from haiku.rag.qa.stock_query_processor import get_stock_processor
+                stock_processor = get_stock_processor(self._client)
+                stock_result = await stock_processor.process_stock_query(question)
+                if stock_result:
+                    return stock_result
+            except Exception:
+                # 如果股票处理器失败，继续使用原有QA流程
+                pass
+            
             # Support custom base URL for OpenAI-compatible APIs
             openai_client = AsyncOpenAI(
                 api_key=Config.OPENAI_API_KEY,
