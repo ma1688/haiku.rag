@@ -22,6 +22,9 @@ class ChunkRepository(BaseRepository[Chunk]):
             self.chunker = FinancialChunker(
                 chunk_size=Config.FINANCIAL_CHUNK_SIZE,
                 chunk_overlap=Config.FINANCIAL_CHUNK_OVERLAP,
+                min_chunk_size=Config.FINANCIAL_MIN_CHUNK_SIZE,
+                max_chunk_size=Config.FINANCIAL_MAX_CHUNK_SIZE,
+                chunk_size_variance=Config.FINANCIAL_CHUNK_SIZE_VARIANCE,
                 preserve_tables=Config.PRESERVE_TABLES,
                 extract_metadata=Config.EXTRACT_METADATA
             )

@@ -27,8 +27,11 @@ class AppConfig(BaseModel):
     
     # Financial document settings
     USE_FINANCIAL_CHUNKER: bool = False  # Enable for HKEx announcements
-    FINANCIAL_CHUNK_SIZE: int = 1500  # Larger chunks for financial docs
-    FINANCIAL_CHUNK_OVERLAP: int = 400  # More overlap for context
+    FINANCIAL_CHUNK_SIZE: int = 500  # Target chunk size for financial docs
+    FINANCIAL_CHUNK_OVERLAP: int = 100  # Overlap for context
+    FINANCIAL_MIN_CHUNK_SIZE: int = 300  # Minimum chunk size
+    FINANCIAL_MAX_CHUNK_SIZE: int = 500  # Maximum chunk size
+    FINANCIAL_CHUNK_SIZE_VARIANCE: int = 100  # Chunk size variance
     PRESERVE_TABLES: bool = True  # Avoid splitting tables
     EXTRACT_METADATA: bool = True  # Extract doc metadata
     

@@ -11,6 +11,9 @@ class FinancialConfig:
     USE_FINANCIAL_QA = Config.USE_FINANCIAL_QA
     FINANCIAL_CHUNK_SIZE = Config.FINANCIAL_CHUNK_SIZE
     FINANCIAL_CHUNK_OVERLAP = Config.FINANCIAL_CHUNK_OVERLAP
+    FINANCIAL_MIN_CHUNK_SIZE = Config.FINANCIAL_MIN_CHUNK_SIZE
+    FINANCIAL_MAX_CHUNK_SIZE = Config.FINANCIAL_MAX_CHUNK_SIZE
+    FINANCIAL_CHUNK_SIZE_VARIANCE = Config.FINANCIAL_CHUNK_SIZE_VARIANCE
     PRESERVE_TABLES = Config.PRESERVE_TABLES
     EXTRACT_METADATA = Config.EXTRACT_METADATA
     
@@ -68,6 +71,9 @@ class FinancialConfig:
         return {
             'chunk_size': cls.FINANCIAL_CHUNK_SIZE,
             'chunk_overlap': cls.FINANCIAL_CHUNK_OVERLAP,
+            'min_chunk_size': cls.FINANCIAL_MIN_CHUNK_SIZE,
+            'max_chunk_size': cls.FINANCIAL_MAX_CHUNK_SIZE,
+            'chunk_size_variance': cls.FINANCIAL_CHUNK_SIZE_VARIANCE,
             'preserve_tables': cls.PRESERVE_TABLES,
             'extract_metadata': cls.EXTRACT_METADATA
         }
